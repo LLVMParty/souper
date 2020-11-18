@@ -276,6 +276,10 @@ add_library(souperCodegen SHARED
   ${SOUPER_CODEGEN_FILES}
 )
 
+add_library(souperCodegenStatic STATIC
+  ${SOUPER_CODEGEN_FILES}
+)
+
 target_compile_definitions(souperPassProfileAll PRIVATE DYNAMIC_PROFILE_ALL=1)
 
 add_executable(clang-souper
@@ -372,7 +376,7 @@ foreach(target souper internal-solver-test lexer-test parser-test souper-check c
                souper2llvm souper-interpret
                souperExtractor souperInfer souperInst souperKVStore souperParser
                souperSMTLIB2 souperTool souperPass souperPassStatic souperPassProfileAll kleeExpr
-               souperCodegen)
+               souperCodegen souperCodegenStatic)
   set_target_properties(${target} PROPERTIES COMPILE_FLAGS "${LLVM_CXXFLAGS}")
   target_include_directories(${target} PRIVATE "${LLVM_INCLUDEDIR}")
 endforeach()
