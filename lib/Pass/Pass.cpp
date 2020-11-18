@@ -88,7 +88,7 @@ static const bool DynamicProfileAll = true;
 static const bool DynamicProfileAll = false;
 #endif
 
-struct SouperPass : public ModulePass {
+struct SouperPass : public FunctionPass {
   static char ID;
 
   Value* getOperand(Inst* I, unsigned index, Instruction *ReplacedInst,
@@ -107,7 +107,7 @@ struct SouperPass : public ModulePass {
   }
 
 public:
-  SouperPass() : ModulePass(ID) {
+  SouperPass() : FunctionPass(ID) {
     if (!S) {
       S = GetSolver(KV);
       if (StaticProfile && !KV)
@@ -198,7 +198,11 @@ public:
         .getValue(I);
   }
 
-  bool runOnFunction(Function *F) {
+  bool runOnFunction(Function &FRef) override {
+    auto F = &FRef;
+    if (F->isDeclaration())
+        return false;
+
     std::string FunctionName;
     if (F->hasLocalLinkage()) {
       FunctionName =
@@ -217,17 +221,17 @@ public:
     InstContext IC;
     ExprBuilderContext EBC;
     std::map<Inst *, Value *> ReplacedValues;
-    LoopInfo *LI = &getAnalysis<LoopInfoWrapperPass>(*F).getLoopInfo();
+    LoopInfo *LI = &getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
     if (!LI)
       report_fatal_error("getLoopInfo() failed");
-    auto &DT = getAnalysis<DominatorTreeWrapperPass>(*F).getDomTree();
-    DemandedBits *DB = &getAnalysis<DemandedBitsWrapperPass>(*F).getDemandedBits();
+    auto &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
+    DemandedBits *DB = &getAnalysis<DemandedBitsWrapperPass>().getDemandedBits();
     if (!DB)
       report_fatal_error("getDemandedBits() failed");
-    LazyValueInfo *LVI = &getAnalysis<LazyValueInfoWrapperPass>(*F).getLVI();
+    LazyValueInfo *LVI = &getAnalysis<LazyValueInfoWrapperPass>().getLVI();
     if (!LVI)
       report_fatal_error("getLVI() failed");
-    ScalarEvolution *SE = &getAnalysis<ScalarEvolutionWrapperPass>(*F).getSE();
+    ScalarEvolution *SE = &getAnalysis<ScalarEvolutionWrapperPass>().getSE();
     if (!SE)
       report_fatal_error("getSE() failed");
     TargetLibraryInfo* TLI = &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(*F);
@@ -397,34 +401,6 @@ public:
     }
     return false;
   }
-
-  bool runOnModule(Module &M) {
-    if (DebugLevel > 3)
-      errs() << "\nEntering the Souper pass's runOnModule()\n\n";
-    if (Verify && verifyModule(M, &errs()))
-      llvm::report_fatal_error("module broken before Souper");
-    bool Changed = false;
-    // get the list first since the dynamic profiling adds functions as it goes
-    std::vector<Function *> FL;
-    for (auto &I : M)
-      FL.push_back((Function *)&I);
-    for (auto *F : FL) {
-      if (F->isDeclaration())
-        continue;
-      while (runOnFunction(F)) {
-        Changed = true;
-        if (DebugLevel > 2)
-          errs() << "rescanning function after transformation was applied\n";
-      }
-    }
-    if (Verify && verifyModule(M, &errs()))
-      llvm::report_fatal_error("module broken after (and probably by) Souper");
-    if (DebugLevel > 1)
-      errs() << "\nExiting the Souper pass's runOnModule() with "
-             << ReplacementsDone << " replacements\n";
-    return Changed;
-  }
-
 };
 
 char SouperPass::ID = 0;
@@ -461,6 +437,7 @@ void addSouperPass(
   PM.add(new SouperPass);
 }
 
+/*
 static llvm::RegisterStandardPasses
 #ifdef DYNAMIC_PROFILE_ALL
 RegisterSouperOptimizer(llvm::PassManagerBuilder::EP_OptimizerLast,
@@ -469,3 +446,4 @@ RegisterSouperOptimizer(llvm::PassManagerBuilder::EP_OptimizerLast,
 RegisterSouperOptimizer(llvm::PassManagerBuilder::EP_Peephole,
                         registerSouperPass);
 #endif
+*/

@@ -430,7 +430,7 @@ private:
     ref<Expr> &E = ExprMap[I];
     if (E.isNull()) {
       E = build(I);
-      assert(E->getWidth() == I->Width);
+      //assert(E->getWidth() == I->Width);
     }
     return E;
   }
