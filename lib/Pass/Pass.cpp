@@ -34,6 +34,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Transforms/Scalar/DCE.h"
+#include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
@@ -364,7 +365,12 @@ public:
         }
       }
 
-      eliminateDeadCode(*F, TLI);
+      //eliminateDeadCode(*F, TLI);
+      llvm::legacy::FunctionPassManager Passes(F->getParent());
+      Passes.add(llvm::createDeadCodeEliminationPass());
+      Passes.doInitialization();
+      Passes.run(*F);
+      Passes.doFinalization();
 
       if (DebugLevel > 2) {
         if (DebugLevel > 4) {

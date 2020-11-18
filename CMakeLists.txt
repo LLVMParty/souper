@@ -11,7 +11,7 @@ endif()
 if (NOT LLVM_BUILD_TYPE)
   set(LLVM_BUILD_TYPE ${CMAKE_BUILD_TYPE})
 endif()
-set(LLVM_CONFIG_EXECUTABLE ${CMAKE_SOURCE_DIR}/third_party/llvm-${LLVM_BUILD_TYPE}-install/bin/llvm-config)
+set(LLVM_CONFIG_EXECUTABLE ${TOB_FOLDER}/llvm/bin/llvm-config)
 if(NOT EXISTS ${LLVM_CONFIG_EXECUTABLE})
   message(FATAL_ERROR "llvm-config could not be found!")
 endif()
@@ -73,10 +73,11 @@ execute_process(
 set(CLANG_CXXFLAGS "")
 set(CLANG_INCLUDEDIR "${LLVM_SRC}/../clang/include" "${LLVM_BUILD}/tools/clang/include")
 
-set(ALIVE_SRCDIR "${CMAKE_SOURCE_DIR}/third_party/alive2")
-set(ALIVE_BUILDDIR "${CMAKE_SOURCE_DIR}/third_party/alive2-build")
-include_directories("${CMAKE_SOURCE_DIR}/third_party")
+set(ALIVE_SRCDIR "${ALIVE2_FOLDER}/include")
+set(ALIVE_BUILDDIR "${ALIVE2_FOLDER}/lib")
+include_directories("${ALIVE2_FOLDER}/")
 include_directories("${ALIVE_SRCDIR}")
+include_directories("${ALIVE_SRCDIR}/alive2")
 
 set(CLANG_LIBS "-lclangCodeGen -lclangTooling -lclangRewrite -lclangFrontend -lclangAnalysis -lclangParse -lclangSerialization -lclangSema -lclangEdit -lclangAnalysis -lclangAST -lclangDriver -lclangLex -lclangBasic -lclangASTMatchers")
 
@@ -92,21 +93,21 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set(PASS_LDFLAGS "-Wl,-undefined,dynamic_lookup")
 endif()
 
-include_directories(include third_party/klee/include)
+include_directories(include ${KLEE_FOLDER}/include)
 include_directories(include "${CMAKE_BINARY_DIR}/include")
 
 set(KLEE_EXPR_FILES
-  third_party/klee/lib/Expr/Constraints.cpp
-  third_party/klee/lib/Expr/ExprBuilder.cpp
-  third_party/klee/lib/Expr/Expr.cpp
-  third_party/klee/lib/Expr/ExprEvaluator.cpp
-  third_party/klee/lib/Expr/ExprPPrinter.cpp
-  third_party/klee/lib/Expr/ExprSMTLIBPrinter.cpp
-  third_party/klee/lib/Expr/ExprUtil.cpp
-  third_party/klee/lib/Expr/ExprVisitor.cpp
-  third_party/klee/lib/Expr/Lexer.cpp
-  third_party/klee/lib/Expr/Parser.cpp
-  third_party/klee/lib/Expr/Updates.cpp
+  ${KLEE_FOLDER}/lib/Expr/Constraints.cpp
+  ${KLEE_FOLDER}/lib/Expr/ExprBuilder.cpp
+  ${KLEE_FOLDER}/lib/Expr/Expr.cpp
+  ${KLEE_FOLDER}/lib/Expr/ExprEvaluator.cpp
+  ${KLEE_FOLDER}/lib/Expr/ExprPPrinter.cpp
+  ${KLEE_FOLDER}/lib/Expr/ExprSMTLIBPrinter.cpp
+  ${KLEE_FOLDER}/lib/Expr/ExprUtil.cpp
+  ${KLEE_FOLDER}/lib/Expr/ExprVisitor.cpp
+  ${KLEE_FOLDER}/lib/Expr/Lexer.cpp
+  ${KLEE_FOLDER}/lib/Expr/Parser.cpp
+  ${KLEE_FOLDER}/lib/Expr/Updates.cpp
 )
 
 add_library(kleeExpr STATIC
@@ -117,7 +118,7 @@ find_path(HIREDIS_INCLUDE_DIR
   NAMES
   hiredis/hiredis.h
   PATHS
-  third_party/hiredis-install/include
+  ${DEPENDENCIES_FOLDER}/hiredis/include
   NO_DEFAULT_PATH)
 
 include_directories(${HIREDIS_INCLUDE_DIR}/hiredis)
@@ -126,24 +127,24 @@ find_library(HIREDIS_LIBRARY
   NAMES
   hiredis
   PATHS
-  third_party/hiredis-install/lib
+  ${DEPENDENCIES_FOLDER}/hiredis/lib
   NO_DEFAULT_PATH)
 
 find_library(ALIVE_LIBRARY alive2 PATHS "${ALIVE_BUILDDIR}" NO_DEFAULT_PATH)
 if (ALIVE_LIBRARY)
   message(STATUS "Alive2: ${ALIVE_LIBRARY}")
-else()
+else()  
   message(SEND_ERROR "Alive2 not found")
 endif()
 
-set(Z3 "${CMAKE_SOURCE_DIR}/third_party/z3-install/bin/z3")
-set(Z3_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/z3-install/include")
+set(Z3 "${TOB_FOLDER}/z3/bin/z3")
+set(Z3_INCLUDE_DIR "${TOB_FOLDER}/z3/include")
 include_directories(${Z3_INCLUDE_DIR})
 
-find_library(Z3_LIBRARY z3 PATHS "${CMAKE_SOURCE_DIR}/third_party/z3-install/lib" NO_DEFAULT_PATH)
+find_library(Z3_LIBRARY z3 PATHS "${TOB_FOLDER}/z3/bin" NO_DEFAULT_PATH)
 if (Z3_LIBRARY)
   message(STATUS "Z3 shared lib: ${Z3_LIBRARY}")
-else()
+else()  
   message(SEND_ERROR "Z3 shared lib not found")
 endif()
 
@@ -259,6 +260,12 @@ add_library(souperPass SHARED
   lib/Pass/Pass.cpp
 )
 
+add_library(souperPassStatic STATIC
+  ${KLEE_EXPR_FILES}
+  ${SOUPER_SOURCES}
+  lib/Pass/Pass.cpp
+)
+
 add_library(souperPassProfileAll SHARED
   ${KLEE_EXPR_FILES}
   ${SOUPER_SOURCES}
@@ -364,7 +371,7 @@ configure_file(
 foreach(target souper internal-solver-test lexer-test parser-test souper-check count-insts
                souper2llvm souper-interpret
                souperExtractor souperInfer souperInst souperKVStore souperParser
-               souperSMTLIB2 souperTool souperPass souperPassProfileAll kleeExpr
+               souperSMTLIB2 souperTool souperPass souperPassStatic souperPassProfileAll kleeExpr
                souperCodegen)
   set_target_properties(${target} PROPERTIES COMPILE_FLAGS "${LLVM_CXXFLAGS}")
   target_include_directories(${target} PRIVATE "${LLVM_INCLUDEDIR}")
