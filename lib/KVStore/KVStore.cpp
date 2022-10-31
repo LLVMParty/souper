@@ -16,7 +16,7 @@
 #include "souper/KVStore/KVSocket.h"
 
 #include "llvm/Support/CommandLine.h"
-#include "hiredis.h"
+#include "hiredis/hiredis.h"
 
 using namespace llvm;
 using namespace souper;

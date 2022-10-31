@@ -1,0 +1,51 @@
+# Reference: https://build-cpp.github.io/cmkr/cmake-toml
+[project]
+name = "Souper"
+version = "1.0"
+include-after = ["cmake/configure.cmake"]
+
+# For some reason a FindZ3.cmake is also included in LLVM so we have to find it manually first
+[find-package.Z3] 
+[find-package.Alive2]
+[find-package.hiredis]
+[find-package.LLVM-Wrapper]
+
+[fetch-content.klee]
+git = "https://github.com/fvrmatteo/klee"
+tag = "pure-bv-qf-llvm-14.0"
+SOURCE_SUBDIR = "fake"
+
+[target.souper]
+type = "static"
+sources = [
+    "lib/Codegen/*.cpp",
+    "lib/Extractor/*.cpp",
+    "lib/Infer/*.cpp",
+    "lib/Inst/*.cpp",
+    "lib/KVStore/*.cpp",
+    "lib/Parser/*.cpp",
+    "lib/SMTLIB2/*.cpp",
+    "lib/Tool/*.cpp",
+]
+headers = [
+    "include/souper/Codegen/*.h",
+    "include/souper/Extractor/*.h",
+    "include/souper/Infer/*.h",
+    "include/souper/Inst/*.h",
+    "include/souper/KVStore/*.h",
+    "include/souper/Parser/*.h",
+    "include/souper/SMTLIB2/*.h",
+    "include/souper/Tool/*.h",
+    "include/souper/Util/*.h",
+]
+link-libraries = [
+    "alive2",
+    "hiredis::hiredis_static",
+    "LLVM-Wrapper",
+]
+private-include-directories = [
+    "include",
+    "${klee_SOURCE_DIR}/include",
+    "${CMAKE_CURRENT_BINARY_DIR}/include",
+]
+include-after = ["cmake/package.cmake"]
