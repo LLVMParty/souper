@@ -124,10 +124,11 @@ target_include_directories(souper PRIVATE
 
 target_link_libraries(souper PUBLIC
 	alive2
-	hiredis::hiredis
+	hiredis::hiredis_static
 	LLVM-Wrapper
 )
 
+include("cmake/klee-expr.cmake")
 include("cmake/package.cmake")
 
 unset(CMKR_TARGET)
