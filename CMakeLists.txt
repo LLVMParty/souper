@@ -36,12 +36,12 @@ include("cmake/configure.cmake")
 
 include(FetchContent)
 
-message(STATUS "Fetching klee (pure-bv-qf-llvm-14.0)...")
+message(STATUS "Fetching klee (pure-bv-qf-llvm-19.0)...")
 FetchContent_Declare(klee
 	GIT_REPOSITORY
-		"https://github.com/fvrmatteo/klee"
+		"https://github.com/mrexodia/klee"
 	GIT_TAG
-		pure-bv-qf-llvm-14.0
+		pure-bv-qf-llvm-19.0
 	SOURCE_SUBDIR
 		fake
 )

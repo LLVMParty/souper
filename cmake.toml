@@ -5,14 +5,14 @@ version = "1.0"
 include-after = ["cmake/configure.cmake"]
 
 # For some reason a FindZ3.cmake is also included in LLVM so we have to find it manually first
-[find-package.Z3] 
+[find-package.Z3]
 [find-package.Alive2]
 [find-package.hiredis]
 [find-package.LLVM-Wrapper]
 
 [fetch-content.klee]
-git = "https://github.com/fvrmatteo/klee"
-tag = "pure-bv-qf-llvm-14.0"
+git = "https://github.com/mrexodia/klee"
+tag = "pure-bv-qf-llvm-19.0"
 SOURCE_SUBDIR = "fake"
 
 [target.souper]
