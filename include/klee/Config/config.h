@@ -13,9 +13,9 @@
 // limitations under the License.
 
 #ifndef LLVM_VERSION_MAJOR
-#define LLVM_VERSION_MAJOR 14
+#define LLVM_VERSION_MAJOR 18
 #endif // LLVM_VERSION_MAJOR
 
 #ifndef LLVM_VERSION_MINOR
-#define LLVM_VERSION_MINOR 0
+#define LLVM_VERSION_MINOR 1
 #endif // LLVM_VERSION_MINOR

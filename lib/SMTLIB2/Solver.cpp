@@ -25,6 +25,7 @@
 #include "souper/SMTLIB2/Solver.h"
 #include <fcntl.h>
 #include <stdio.h>
+#include <optional>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -275,7 +276,7 @@ public:
         return EC;
       }
 
-      if ((*MB)->getBuffer().startswith("sat\n")) {
+      if ((*MB)->getBuffer().starts_with("sat\n")) {
         ::remove(OutputPath.c_str());
         Result = true;
         // ++Sats;
@@ -287,7 +288,7 @@ public:
         if (!ErrStr.empty())
           return std::make_error_code(std::errc::protocol_error);
         return std::error_code();
-      } else if ((*MB)->getBuffer().startswith("unsat\n")) {
+      } else if ((*MB)->getBuffer().starts_with("unsat\n")) {
         ::remove(OutputPath.c_str());
         Result = false;
         // ++Unsats;
@@ -313,8 +314,8 @@ SolverProgram souper::makeExternalSolverProgram(StringRef Path) {
     std::vector<StringRef> ArgPtrs;
     ArgPtrs.push_back(PathStr);
     ArgPtrs.insert(ArgPtrs.end(), Args.begin(), Args.end());
-    Optional<StringRef> Redirects[] = {RedirectIn, RedirectOut, RedirectErr};
-    return sys::ExecuteAndWait(PathStr, ArgPtrs, None, Redirects, Timeout);
+    std::optional<StringRef> Redirects[] = {RedirectIn, RedirectOut, RedirectErr};
+    return sys::ExecuteAndWait(PathStr, ArgPtrs, {}, Redirects, Timeout);
   };
 }
 
@@ -359,7 +360,7 @@ SolverProgram souper::makeInternalSolverProgram(int MainPtr(int argc,
     } else {
       sys::ProcessInfo PI;
       PI.Pid = pid;
-      PI = sys::Wait(PI, Timeout, /*WaitUntilTerminates=*/Timeout == 0);
+      PI = sys::Wait(PI, Timeout);
       return PI.ReturnCode;
     }
   };

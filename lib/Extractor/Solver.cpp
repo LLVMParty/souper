@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// #define DEBUG_TYPE "souper"
-
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -34,12 +32,14 @@
 
 #include <unordered_map>
 
-// STATISTIC(MemHitsInfer, "Number of internal cache hits for infer()");
-// STATISTIC(MemMissesInfer, "Number of internal cache misses for infer()");
-// STATISTIC(MemHitsIsValid, "Number of internal cache hits for isValid()");
-// STATISTIC(MemMissesIsValid, "Number of internal cache misses for isValid()");
-// STATISTIC(ExternalHits, "Number of external cache hits");
-// STATISTIC(ExternalMisses, "Number of external cache misses");
+#define DEBUG_TYPE "souper"
+
+STATISTIC(MemHitsInfer, "Number of internal cache hits for infer()");
+STATISTIC(MemMissesInfer, "Number of internal cache misses for infer()");
+STATISTIC(MemHitsIsValid, "Number of internal cache hits for isValid()");
+STATISTIC(MemMissesIsValid, "Number of internal cache misses for isValid()");
+STATISTIC(ExternalHits, "Number of external cache hits");
+STATISTIC(ExternalMisses, "Number of external cache misses");
 
 using namespace souper;
 using namespace llvm;
@@ -96,7 +96,7 @@ public:
   }
 
   llvm::APInt getClearedBit(unsigned Pos, unsigned W) {
-    APInt AllOnes = APInt::getAllOnesValue(W);
+    APInt AllOnes = APInt::getAllOnes(W);
     AllOnes.clearBit(Pos);
     return AllOnes;
   }
@@ -169,7 +169,7 @@ public:
                                    InstContext &IC) override {
     unsigned W = LHS->Width;
 
-    if (!LHS->DemandedBits.isAllOnesValue()) {
+    if (!LHS->DemandedBits.isAllOnes()) {
       LHS = IC.getInst(Inst::And, W, {LHS, IC.getConst(LHS->DemandedBits)});
     }
 
@@ -191,7 +191,7 @@ public:
          it != VarsVect.end(); ++it) {
        std::string VarName = it->first;
        unsigned VarWidth = VarsVect[VarName];
-       APInt ResultDB = APInt::getNullValue(VarWidth);
+       APInt ResultDB = APInt::getZero(VarWidth);
 
       for (unsigned Bit=0; Bit<VarWidth; Bit++) {
         std::map<Inst *, Inst *> InstCache;
@@ -215,7 +215,7 @@ public:
                    Inst *LHS, InstContext &IC) {
     unsigned W = LHS->Width;
     Inst *Mask = IC.getConst(APInt::getOneBitSet(W, W-1));
-    InstMapping Mapping(IC.getInst(Inst::And, W, { LHS, Mask }), IC.getConst(APInt::getNullValue(W)));
+    InstMapping Mapping(IC.getInst(Inst::And, W, { LHS, Mask }), IC.getConst(APInt::getZero(W)));
     bool IsSat;
     std::error_code EC = SMTSolver->isSatisfiable(BuildQuery(IC, BPCs, PCs,
                                                   Mapping, 0, /*Precondition=*/0),
@@ -307,8 +307,8 @@ public:
                           Inst *LHS, KnownBits &Known,
                           InstContext &IC) override {
     unsigned W = LHS->Width;
-    Known.One = APInt::getNullValue(W);
-    Known.Zero = APInt::getNullValue(W);
+    Known.One = APInt::getZero(W);
+    Known.Zero = APInt::getZero(W);
     for (unsigned I=0; I<W; I++) {
       APInt ZeroGuess = Known.Zero | APInt::getOneBitSet(W, I);
       if (testKnown(BPCs, PCs, ZeroGuess, Known.One, LHS, IC)) {
@@ -385,7 +385,7 @@ public:
       Inst *ShiftAmt = IC.getConst(APInt(W, W-I, false));
       Inst *Res = IC.getInst(Inst::AShr, W, {LHS, ShiftAmt});
       Inst *Guess1 = IC.getInst(Inst::Eq, 1, {Res, IC.getConst(APInt(W, 0, false))});
-      Inst *Guess2 = IC.getInst(Inst::Eq, 1, {Res, IC.getConst(APInt::getAllOnesValue(W))});
+      Inst *Guess2 = IC.getInst(Inst::Eq, 1, {Res, IC.getConst(APInt::getAllOnes(W))});
       Inst *Guess = IC.getInst(Inst::Or, 1, {Guess1, Guess2});
       InstMapping Mapping(Guess, True);
       bool IsSat;
@@ -470,11 +470,13 @@ public:
     if (RHSs.size() <= 1)
       return EC;
 
+#if 0
     for (auto &RHS : RHSs) {
       BackendCost BC;
       getBackendCost(IC, RHS, BC);
       // FIXME sort the list
     }
+#endif
 
     return EC;
   }
@@ -617,7 +619,7 @@ public:
                                     InstContext &IC) override {
     unsigned W = LHS->Width;
 
-    APInt L = APInt(W, 1), R = APInt::getAllOnesValue(W);
+    APInt L = APInt(W, 1), R = APInt::getAllOnes(W);
     APInt BinSearchResultX, BinSearchResultC;
     bool BinSearchHasResult = false;
 
@@ -670,7 +672,7 @@ public:
     std::string Repl = GetReplacementLHSString(BPCs, PCs, LHS, Context);
     const auto &ent = InferCache.find(Repl);
     if (ent == InferCache.end()) {
-      // ++MemMissesInfer;
+      ++MemMissesInfer;
       std::error_code EC = UnderlyingSolver->infer(BPCs, PCs, LHS, RHSs,
                                                    AllowMultipleRHSs, IC);
       std::string RHSStr;
@@ -681,7 +683,7 @@ public:
       InferCache.emplace(Repl, std::make_pair(EC, RHSStr));
       return EC;
     } else {
-      // ++MemHitsInfer;
+      ++MemHitsInfer;
       std::string ES;
       StringRef S = ent->second.second;
       if (S == "") {
@@ -723,13 +725,13 @@ public:
     std::string Repl = GetReplacementString(BPCs, PCs, Mapping);
     const auto &ent = IsValidCache.find(Repl);
     if (ent == IsValidCache.end()) {
-      // ++MemMissesIsValid;
+      ++MemMissesIsValid;
       std::error_code EC = UnderlyingSolver->isValid(IC, BPCs, PCs,
                                                      Mapping, IsValid, 0);
       IsValidCache.emplace(Repl, std::make_pair(EC, IsValid));
       return EC;
     } else {
-      // ++MemHitsIsValid;
+      ++MemHitsIsValid;
       IsValid = ent->second.second;
       return ent->second.first;
     }
@@ -830,7 +832,7 @@ public:
     if (KV->hGet(LHSStr, "rhs", S)) {
       if (DebugLevel > 3)
         llvm::errs() << "(external cache hit)\n";
-      // ++ExternalHits;
+      ++ExternalHits;
       if (S == "") {
         RHSs.clear();
       } else {
@@ -842,7 +844,7 @@ public:
       }
       return std::error_code();
     } else {
-      // ++ExternalMisses;
+      ++ExternalMisses;
       if (DebugLevel > 3)
         llvm::errs() << "(external cache miss)\n";
       if (NoInfer) {

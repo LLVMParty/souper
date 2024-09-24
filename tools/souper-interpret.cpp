@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/KnownBits.h"
 #include "llvm/Support/MemoryBuffer.h"
 
@@ -56,15 +58,15 @@ namespace {
     APInt unknownB = ~(b.One ^ b.Zero);
 
     // report if there's any conflict in known bits
-    if (!((a.Zero & b.One).isNullValue()) || !((a.One & b.Zero).isNullValue()))
+    if (!((a.Zero & b.One).isZero()) || !((a.One & b.Zero).isZero()))
       return CompareDataflowResult::INCOMPARABLE;
 
-    if ((unknownA | unknownB).countPopulation() >
-	std::max(unknownA.countPopulation(), unknownB.countPopulation()))
+    if ((unknownA | unknownB).popcount() >
+	std::max(unknownA.popcount(), unknownB.popcount()))
       return CompareDataflowResult::INCOMPARABLE;
-    else if (unknownA.countPopulation() > unknownB.countPopulation())
+    else if (unknownA.popcount() > unknownB.popcount())
       return CompareDataflowResult::LESS;
-    else if (unknownA.countPopulation() < unknownB.countPopulation())
+    else if (unknownA.popcount() < unknownB.popcount())
       return CompareDataflowResult::GREATER;
     else
       return CompareDataflowResult::SAME;
@@ -102,9 +104,10 @@ static bool parseInput(const std::string &S, std::string &Name,
 
 static bool fitsInBits(std::string str, unsigned bits) {
   auto I = APInt(bits, str, 10);
-  std::string S = llvm::toString(I, 10, true);
-  std::string U = llvm::toString(I, 10, false);
-  return (str.compare(S) == 0) || (str.compare(U) == 0);
+  llvm::SmallString<64> S, U;
+  I.toStringSigned(S);
+  I.toStringUnsigned(U);
+  return S.equals(str) || U.equals(str);
 }
 
 static int Interpret(const MemoryBufferRef &MB, Solver *S) {
@@ -142,8 +145,9 @@ static int Interpret(const MemoryBufferRef &MB, Solver *S) {
       llvm::outs() << "Constant Range result: " << CR << "\n";
 
       auto RB = RestrictedBitsAnalysis().findRestrictedBits(Reps[i].Mapping.LHS);
-      llvm::outs() << "Restricted Bits result: " << llvm::toString(RB, 2, false) << "\n";
-
+      llvm::SmallString<64> S;
+      RB.toString(S, 2, false);
+      llvm::outs() << "Restricted Bits result: " << S << "\n";
 
       auto PrintDB = [](std::string Preamble, auto DB) {
         llvm::outs() << Preamble << "\n";

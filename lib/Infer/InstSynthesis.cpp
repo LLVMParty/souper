@@ -326,9 +326,9 @@ void InstSynthesis::setCompLibrary() {
       else if (K == Inst::ZExt || K == Inst::SExt || K == Inst::Trunc)
         report_fatal_error("don't use zext/sext/trunc explicitly");
       else if (K == Inst::None)
-        report_fatal_error((llvm::StringRef)"unknown instruction: " + KindStr);
+        report_fatal_error(("unknown instruction: " + KindStr).c_str());
       else if (UnsupportedCompKinds.count(K))
-        report_fatal_error((llvm::StringRef)"unsupported instruction: " + KindStr);
+        report_fatal_error(("unsupported instruction: " + KindStr).c_str());
       else
         Kinds.push_back(K);
     }
@@ -773,7 +773,7 @@ Inst *InstSynthesis::getComponentInputConstraint(InstContext &IC) {
     if (DebugLevel > 2)
       llvm::outs() << "false\n";
     if (Ante == IC.getConst(APInt(1, false)))
-      report_fatal_error((llvm::StringRef)"no input available for " + getLocVarStr(L_x.first));
+      report_fatal_error(("no input available for " + getLocVarStr(L_x.first)).c_str());
     Ret = IC.getInst(Inst::And, 1, {Ret, Ante});
   }
 
@@ -929,8 +929,8 @@ Inst *InstSynthesis::createInstFromWiring(
     LocVar Match = getWiringLocVar(OpLoc, LineWiring);
     assert(CompInstMap.count(Match) && "unknown matching location variable");
     if (!CompInstMap.count(Match))
-      report_fatal_error((llvm::StringRef)"synthesis bug: component input " +
-                         getLocVarStr(OpLoc) + " not wired");
+      report_fatal_error(("synthesis bug: component input " +
+                          getLocVarStr(OpLoc) + " not wired").c_str());
     // Store wiring locations
     auto Left = getLocVarStr(OpLoc, LOC_PREFIX);
     auto Right = getLocVarStr(Match, LOC_PREFIX);
@@ -1206,7 +1206,7 @@ Inst *InstSynthesis::createCleanInst(Inst::Kind Kind, unsigned Width,
   case Inst::FShr:
     if (Ops[2]->K == Inst::Const) {
       APInt ShAmtModWidth(Width, Ops[2]->Val.urem(Width));
-      if (ShAmtModWidth.isNullValue()) {
+      if (ShAmtModWidth.isZero()) {
         if (Kind == Inst::FShl)
           return Ops[0];
         if (Kind == Inst::FShr)
@@ -1229,16 +1229,16 @@ Inst *InstSynthesis::createCleanInst(Inst::Kind Kind, unsigned Width,
 
   case Inst::SAddSat:
   case Inst::UAddSat:
-    if (Ops[0]->K == Inst::Const && Ops[0]->Val.isNullValue()) {
+    if (Ops[0]->K == Inst::Const && Ops[0]->Val.isZero()) {
       return Ops[1];
-    } else if (Ops[1]->K == Inst::Const && Ops[1]->Val.isNullValue()) {
+    } else if (Ops[1]->K == Inst::Const && Ops[1]->Val.isZero()) {
       return Ops[0];
     }
     break;
 
   case Inst::SSubSat:
   case Inst::USubSat:
-    if (Ops[1]->K == Inst::Const && Ops[1]->Val.isNullValue())
+    if (Ops[1]->K == Inst::Const && Ops[1]->Val.isZero())
       return Ops[0];
     break;
 
@@ -1431,7 +1431,7 @@ Inst *InstSynthesis::initConcreteInputWirings(Inst *Query, Inst *WiringQuery,
     }
     Inst *Copy = replaceVars(WiringQuery, *LIC, InputMap);
     Query = LIC->getInst(Inst::And, 1, {Query, Copy});
-    Query->DemandedBits = APInt::getAllOnesValue(Query->Width);
+    Query->DemandedBits = APInt::getAllOnes(Query->Width);
   }
 
   return Query;
