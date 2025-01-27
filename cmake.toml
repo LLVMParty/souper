@@ -11,7 +11,7 @@ include-after = ["cmake/configure.cmake"]
 [find-package.LLVM-Wrapper]
 
 [fetch-content.klee]
-git = "https://github.com/mrexodia/klee"
+git = "https://github.com/LLVMParty/klee"
 tag = "pure-bv-qf-llvm-19.0"
 SOURCE_SUBDIR = "fake"
 
