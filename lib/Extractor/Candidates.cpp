@@ -30,6 +30,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/PassManager.h"
+#include "llvm/IR/PatternMatch.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/CommandLine.h"
@@ -241,7 +242,7 @@ Inst *ExprBuilder::makeArrayRead(Value *V) {
     }
 
     if (V->getType()->isIntegerTy()) {
-      if (Instruction *I = dyn_cast<Instruction>(V)) {
+      if (auto *I = dyn_cast<Instruction>(V)) {
         // TODO: Find out a better way to get the current basic block
         // with this approach, we might be restricting the constant
         // range harvesting. Because range info. might be coming from
@@ -335,7 +336,7 @@ void ExprBuilder::markExternalUses (Inst *I) {
 
 Inst *ExprBuilder::build(Value *V, APInt DemandedBits) {
   Inst *I = buildHelper(V);
-  I->DemandedBits = DemandedBits;
+  I->DemandedBits = std::move(DemandedBits);
   return I;
 }
 
@@ -499,14 +500,19 @@ Inst *ExprBuilder::buildHelper(Value *V) {
         break; // could be a vector operation
       return IC.getInst(Inst::Trunc, DestSize, {Op});
 
-    default:
-      ; // fallthrough to return below
+    default:; // fallthrough to return below
     }
+  } else if (PatternMatch::m_PtrAdd(PatternMatch::m_Value(),
+                                    PatternMatch::m_Value())
+                 .match(V)) {
+    auto *I = llvm::dyn_cast<llvm::Instruction>(V);
+    Inst *L = get(I->getOperand(0)), *R = get(I->getOperand(1));
+    return IC.getInst(Inst::Add, L->Width, {L, R});
   } else if (auto GEP = dyn_cast<GetElementPtrInst>(V)) {
     if (isa<VectorType>(GEP->getType()))
       return makeArrayRead(V); // vector operation
     // TODO: replace with a GEP instruction
-    //return buildGEP(get(GEP->getOperand(0)), gep_type_begin(GEP),
+    // return buildGEP(get(GEP->getOperand(0)), gep_type_begin(GEP),
     //                gep_type_end(GEP));
     return makeArrayRead(V);
   } else if (auto Phi = dyn_cast<PHINode>(V)) {
@@ -660,7 +666,7 @@ Inst *ExprBuilder::get(Value *V, APInt DemandedBits) {
   // Cache V if V is not found in InstMap
   Inst *&E = EBC.InstMap[V];
   if (!E)
-    E = build(V, DemandedBits);
+    E = build(V, std::move(DemandedBits));
   if (E->K != Inst::Const && !E->hasOrigin(V))
     E->Origins.push_back(V);
   return E;
@@ -959,6 +965,12 @@ void PrintDataflowInfo(Function &F, Instruction &I, LazyValueInfo &LVI,
   }
 }
 
+bool isPtrAdd(llvm::Value *V) {
+  return PatternMatch::m_PtrAdd(PatternMatch::m_Value(),
+                                PatternMatch::m_Value())
+      .match(V);
+}
+
 void ExtractExprCandidates(Function &F, const LoopInfo &LI, DemandedBits &DB,
                            LazyValueInfo &LVI, ScalarEvolution &SE,
                            TargetLibraryInfo &TLI,
@@ -1007,18 +1019,18 @@ void ExtractExprCandidates(Function &F, const LoopInfo &LI, DemandedBits &DB,
         std::unordered_set<llvm::Instruction *> Visited;
         for (auto &Op : I.operands()) {
           // TODO: support regular values
-          if (auto U = dyn_cast<Instruction>(Op)){
+          if (auto U = dyn_cast<Instruction>(Op)) {
             // If uses are in the same block with its def, give up
             if (U->getParent() == &BB)
               continue;
             if (U->getType()->isIntegerTy()) {
-              if(Visited.insert(U).second) {
+              if (Visited.insert(U).second) {
                 Inst *In = EB.getFromUse(U);
                 In->HarvestKind = HarvestType::HarvestedFromUse;
                 In->HarvestFrom = &BB;
                 if (MarkExternalUses)
                   EB.markExternalUses(In);
-                BCS->Replacements.emplace_back(U, InstMapping(In, 0));
+                BCS->Replacements.emplace_back(U, InstMapping(In, nullptr));
                 assert(EB.get(U)->hasOrigin(U));
               }
             }
@@ -1026,11 +1038,20 @@ void ExtractExprCandidates(Function &F, const LoopInfo &LI, DemandedBits &DB,
         }
       }
 
+      // Skip unused instructions
+      if (I.hasNUses(0)) {
+        continue;
+      }
+
+      // Handle 'ptradd' instructions as integers
+      else if (Opts.PtrAddAsInteger && isPtrAdd(&I)) {
+      }
+
       // Harvest Defs
-      if (!I.getType()->isIntegerTy())
+      else if (!I.getType()->isIntegerTy()) {
         continue;
-      if (I.hasNUses(0))
-        continue;
+      }
+
       Inst *In;
       if (HarvestDataFlowFacts) {
         APInt DemandedBits = DB.getDemandedBits(&I);

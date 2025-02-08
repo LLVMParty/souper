@@ -39,7 +39,7 @@ include(FetchContent)
 message(STATUS "Fetching klee (pure-bv-qf-llvm-19.0)...")
 FetchContent_Declare(klee
 	GIT_REPOSITORY
-		"https://github.com/mrexodia/klee"
+		"https://github.com/LLVMParty/klee"
 	GIT_TAG
 		pure-bv-qf-llvm-19.0
 	SOURCE_SUBDIR

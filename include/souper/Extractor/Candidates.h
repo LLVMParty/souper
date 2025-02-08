@@ -80,6 +80,9 @@ struct ExprBuilderOptions {
   /// controlled IR input (i.e. the unit tests).
   bool NamedArrays;
 
+  // Whether to treat a 'ptradd' candidate as an integer expression
+  bool PtrAddAsInteger;
+
   llvm::Value *CandidateFilterInstruction;
 
   ExprBuilderOptions() : NamedArrays(false), CandidateFilterInstruction(nullptr) {}
